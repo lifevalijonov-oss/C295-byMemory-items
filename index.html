@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c0f13">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>C-295 Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: строгий, лётный — как QRH в кабине, без украшений
+   IDEA: карта «Emergency Procedures List»: пункт … точечная линия … ДЕЙСТВИЕ | член экипажа
+   PICTURE: сама карта-тренажёр с закрываемыми действиями — она и есть главный экран
+   COLOUR and TYPE: бумага/ночная кабина, красный WARNING, янтарный CAUTION, зелёный «знал»; Barlow Condensed + Barlow
+   LAYOUT: шапка с режимами, выбор процедуры, большая карта; на телефоне — одна колонка */
+:root{color-scheme:light dark;
+--bg:light-dark(#eef0f2,#0c0f13);--card:light-dark(#ffffff,#151a20);--ink:light-dark(#14171a,#e6e9ec);
+--mut:light-dark(#5d6670,#8f99a4);--line:light-dark(#d5dade,#2a323b);
+--red:light-dark(#c8102e,#ff5257);--amb:light-dark(#a86a00,#ffb020);--ok:light-dark(#1f7a45,#3ccf7a);
+--soft:light-dark(#f5f6f7,#1b2129);--hi:light-dark(#fff4d6,#2b2414)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3,.cond{font-family:"Barlow Condensed","Roboto Condensed",sans-serif-condensed,Barlow,sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:calc(14px + env(safe-area-inset-top)) max(4vw,14px,env(safe-area-inset-right)) 0 max(4vw,14px,env(safe-area-inset-left))}
+.top{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
+h1{margin:0;font-size:clamp(26px,4vw,36px);line-height:1.05;font-weight:700}
+h1 b{color:var(--red)}
+.stat{color:var(--mut);font-size:14px}
+nav{display:flex;gap:4px;overflow-x:auto;margin-top:12px}
+nav button{flex:none;border:0;background:none;color:var(--mut);font:600 17px "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;padding:10px 14px;min-height:44px;border-bottom:3px solid transparent;cursor:pointer}
+nav button.on{color:var(--ink);border-bottom-color:var(--red)}
+main{max-width:980px;margin:0 auto;padding:18px max(4vw,12px) 60px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+select,.btn,input{font:inherit;font-size:16px;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 12px}
+select{flex:1 1 260px;font-weight:600}
+.btn{cursor:pointer;font-weight:600}
+.btn.pri{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.btn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.btn.no{background:var(--red);color:#fff;border-color:var(--red)}
+.btn:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:3px solid var(--amb);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ch{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.ch h2{margin:0;font-size:clamp(24px,3.4vw,32px);line-height:1.05;text-wrap:balance}
+.grp{color:var(--mut);font-size:14px;margin-top:4px}
+.trig{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.ann{font:700 14px "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;letter-spacing:.02em;padding:3px 8px;border:2px solid currentColor;border-radius:4px}
+.ann.W{color:var(--red)}.ann.C{color:var(--amb)}
+.tx{font-size:14px;color:var(--mut)}
+.note{margin:10px 0 0;font-size:14px;color:var(--mut)}
+.ph{font:600 17px "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;color:var(--red);padding:10px 18px 2px}
+.row{display:grid;grid-template-columns:2.2em minmax(0,1fr) auto 3.6em;gap:6px;align-items:baseline;padding:9px 18px;border-top:1px dashed var(--line);font:500 18px "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif}
+.row .n{color:var(--mut)}
+.row .it{display:flex;gap:6px;align-items:baseline}
+.row .it span{flex:none;max-width:100%}
+.row .it i{flex:1;border-bottom:2px dotted var(--line);transform:translateY(-4px);min-width:12px}
+.row .ac{font-weight:700;text-align:right}
+.row .cr{text-align:right;font-weight:700}
+.star{color:var(--red)}
+.mask{background:var(--soft);color:transparent;border-radius:4px;user-select:none;cursor:pointer}
+.mask::after{content:"?";color:var(--mut)}
+.row.cur{background:var(--hi)}
+.row.good .ac{color:var(--ok)}.row.bad .ac{color:var(--red)}
+.foot{display:flex;flex-wrap:wrap;gap:8px;padding:14px 18px;border-top:1px solid var(--line);background:var(--soft)}
+.foot .sp{flex:1}
+.msg{padding:12px 18px;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:14px 18px}
+.chip{font:500 17px "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;text-align:left;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:var(--ink);cursor:pointer;min-height:44px}
+.chip.shake{animation:sh .3s;border-color:var(--red)}
+@keyframes sh{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+@media (prefers-reduced-motion:reduce){.chip.shake{animation:none}}
+.opts{display:grid;gap:8px;padding:14px 18px}
+.opt{text-align:left;font:600 18px "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:var(--ink);cursor:pointer;min-height:48px}
+.opt.r{background:var(--ok);color:#fff;border-color:var(--ok)}.opt.w{background:var(--red);color:#fff;border-color:var(--red)}
+.wr{padding:10px 18px 14px;border-top:1px dashed var(--line)}
+.wr .q{font:600 19px "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif}
+.wr .q .ph2{color:var(--red);font-size:15px;display:block}
+.wr input{width:100%;margin:8px 0;text-transform:uppercase;font-family:"Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;font-weight:600;font-size:19px}
+.crew{display:flex;flex-wrap:wrap;gap:6px}
+.crew button{min-width:52px;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:var(--ink);font:700 16px "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;cursor:pointer}
+.crew button.on{background:var(--ink);color:var(--card)}
+.res{margin-top:8px;font-weight:600}
+.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;color:var(--ink);font:inherit}
+.li b{font:600 17px/1.15 "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;display:block}
+.li small{color:var(--mut)}
+.box{display:flex;gap:3px}.box i{width:8px;height:18px;border-radius:2px;background:var(--line)}.box i.f{background:var(--ok)}
+.due{color:var(--red);font-weight:600}
+.seg{display:flex;gap:4px;margin-top:12px;background:var(--soft);border-radius:10px;padding:4px;max-width:420px}
+.seg button{flex:1;border:0;border-radius:8px;background:none;color:var(--mut);font:700 17px "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;min-height:40px;cursor:pointer}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.ch h2.qq{font-size:clamp(22px,3vw,28px)}
+.ans{font:700 22px/1.25 "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;margin:4px 0}
+.apx{font:600 13px Barlow,sans-serif;color:var(--amb);white-space:nowrap}
+.meter{width:70px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}.meter i{display:block;height:100%;background:var(--ok)}
+.tbl{margin-bottom:12px}.lr{padding:10px 18px;border-top:1px dashed var(--line)}
+.lq{color:var(--mut);font-size:15px}.la{font:700 19px/1.3 "Barlow Condensed","Roboto Condensed",sans-serif-condensed,sans-serif;margin-top:2px}
+.la.mask{min-height:28px}
+.hint{color:var(--mut);font-size:14px;margin:12px 2px 0}
+@media(max-width:600px){.row{grid-template-columns:1.8em minmax(0,1fr) 3em;font-size:17px}.row .ac{grid-column:2;text-align:left}.row .cr{grid-row:1;grid-column:3}.row .it i{display:none}.ph,.row,.ch,.foot,.chips,.opts,.wr,.msg{padding-left:12px;padding-right:12px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><h1>C-295 · <b>Trainer</b></h1><span class="stat" id="stat"></span></div>
+  <div class="seg" id="seg"><button data-s="mi">Memory Items</button><button data-s="lim">Ограничения</button></div>
+  <nav id="nav"></nav>
+</header>
+<main>
+  <div class="bar" id="bar"><select id="sel" aria-label="Процедура"></select><button class="btn" id="rnd">Случайная</button><button class="btn" id="nxt">Следующая по очереди</button></div>
+  <div class="bar" id="lbar" hidden><select id="lsel" aria-label="Категория"></select></div>
+  <div id="view"></div>
+  <p class="hint" id="hintmi">Источник: A.O.M. (P.) C-295MW-UZ01-1, Section IV — только пункты, напечатанные жирным (memory items). Колонка справа: 1 = C/M-1, 2 = C/M-2, <span class="star">*</span> = объявить вслух и выполнить после подтверждения другого C/M. Прогресс хранится на этом устройстве.</p>
+  <p class="hint" id="hintlim" hidden>Источник: A.O.M. (P.) C-295MW-UZ01-1, Section I — ограничения military и общие (разделы CIVIL исключены). «≈ по графику» — значение снято с графика AOM; точное значение — по самому графику. Прогресс хранится на этом устройстве.</p>
+</main>
+<script>
+{
+const W='W',C='C',T='t';
+const P=[
+{id:'smk',t:'SMOKE OR FIRE AT THE COCKPIT OR CARGO CABIN',g:'General',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'CARGO SMK'],[T,'Fire evidence']],ru:'Дым/огонь в кабине экипажа или грузовой кабине',ph:[[null,[[1,'Masks and Goggles','ON / ADJUSTED / 100% / EMERGENCY','ALL'],[2,'MASK Pushbutton','PRESS','ALL']]]]},
+{id:'gear',t:'LANDING WITH ABNORMAL LANDING GEAR CONFIGURATION',g:'General',tr:[],ru:'Заход на посадку с ненормальной конфигурацией шасси',ph:[['At 150 ft:',[[23,'"Brace for impact"','ORDER','2']]],['With aircraft stopped:',[[24,'Parking Brake (if required)','SET','1'],[25,'FFLs','DIRECTLY TO OFF','2'],[26,'Fire Handles','PULL AND TURN BOTH TO DISCH 1','2'],[27,'Fuel Pumps','OFF','2'],[28,'Evacuation','ORDER','1'],[29,'MSTR ELEC (BAT and GEN) Switches','OFF','1']]]]},
+{id:'forced',t:'FORCED LANDING',g:'General',tr:[],ru:'Вынужденная посадка вне аэродрома',ph:[['Imminent contact:',[[25,'"Brace for impact"','ORDER','2']]],['Upon contact:',[[26,'FFLs','DIRECTLY TO OFF','2*'],[27,'Fire Handles','PULLED','2'],[28,'Fuel Pumps','OFF','2']]],['When the aircraft stops:',[[29,'Fire Handles','TURN BOTH TO DISCH 1','2'],[30,'Evacuation','ORDER','1'],[31,'Portable ELT','REMOVE','LM/2'],[32,'MSTR ELEC (BAT and GEN) Switch','OFF','1']]]]},
+{id:'ditch',t:'DITCHING',g:'General',tr:[],ru:'Вынужденная посадка на воду',ph:[['Imminent ditching:',[[25,'"Brace for impact"','ORDER','2'],[26,'Nose Up Attitude','10º APPROXIMATELY','1']]],['Upon contact:',[[27,'FFLs','DIRECTLY TO OFF','2*'],[28,'Fire Handles','PULLED','2'],[29,'Fuel Pumps','OFF','2']]],['When the aircraft stops:',[[30,'Fire Handles','TURN BOTH TO DISCH 1','2'],[31,'Evacuation','ORDER','1'],[32,'Portable ELT','REMOVE','LM/2'],[33,'MSTR (BAT and GEN) Switches','OFF','1']]]]},
+{id:'efireg',t:'ENGINE FIRE OR SEVERE DAMAGE ON GROUND',g:'On ground',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'1 E/FIRE'],[T,'or'],[W,'2 E/FIRE'],[T,'FIRE BELL']],ru:'На земле: пожар двигателя / сильная вибрация, шум',note:'A. Если все признаки пожара погасли после шага 4 → ENGINE SHUTDOWN ON GROUND. B.1 Если погасли до 30 с → ENGINE SHUTDOWN ON GROUND.',ph:[[null,[[1,'PLs (both)','GI','1'],[2,'Parking Brake (with aircraft stopped)','SET','1'],[3,'FFL (affected engine)','DIRECTLY TO OFF','2*'],[4,'Fire Handle (affected engine)','PULL / CHECK READY','2*']]],['B. If any fire indication persists:',[[5,'Fire Handle (affected engine)','TURN TO DISCH 1 / CHECK EMPTY','2*'],[6,'Clock','RUNNING','2']]],['B.2. If any fire indication persists after 30 seconds:',[[7,'Fire Handle (affected engine)','TURN TO DISCH 2 / CHECK EMPTY','2*']]]]},
+{id:'abort',t:'ABORTED TAKEOFF',g:'On ground',tr:[],ru:'Отказ до V1 — C/M-1 командует «ABORT»',note:'При прерванном взлёте из-за пожара/серьёзного повреждения двигателя реверс НЕ использовать.',ph:[[null,[[1,'PLs','GI','1'],[2,'Brakes','A.R.','1'],[3,'Control Column','SLIGHT FORWARD FORCE','2'],[4,'Corresponding Emergency Procedure','APPLY','1/2']]]]},
+{id:'esmkg',t:'ELECTRICAL SMOKE OR FIRE ON GROUND',g:'On ground',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'CARGO SMK']],ru:'На земле: дым от электрооборудования',ph:[[null,[[1,'Tower / Loadmaster / Ground Personnel','NOTIFY','1/2'],[2,'MSTR ELEC BAT and GEN Switches (and GPU)','OFF','2']]]]},
+{id:'evac',t:'GROUND EVACUATION',g:'On ground',tr:[],ru:'Необходима аварийная эвакуация на земле',ph:[[null,[[1,'Parking Brake (with aircraft stopped)','SET','1'],[2,'Tower, Loadmaster, Ground Personnel','NOTIFY','1/2'],[3,'FFLs','DIRECTLY TO OFF','2'],[4,'Both Fire Handles','PULL','2'],[5,'Both Fire Handles (if required)','TURN TO DISCH 1','2'],[6,'Emergency Lights','ON','2'],[7,'PRESS DUMP switch','ON','2'],[8,'Ramp','A.R.','2'],[9,'Evacuation','ORDER','1'],[10,'MSTR ELEC BAT and GEN Switches (and GPU)','OFF','1'],[11,'Leave the aircraft','','ALL']]]]},
+{id:'acsmk',t:'AIR-CONDITIONING SMOKE',g:'Environmental',tr:[[T,'Smoke from A/C system, with/without'],[W,'WARNING'],[W,'CARGO SMK']],ru:'Дым из системы кондиционирования',ph:[[null,[[1,'Masks and Goggles','ON / ADJUSTED / 100% / EMERGENCY','ALL'],[2,'MASK Pushbutton','PRESS','ALL']]]]},
+{id:'rapid',t:'RAPID DEPRESSURIZATION',g:'Environmental',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'CABIN']],ru:'Резкий рост высоты в кабине, шум, конденсат, падение температуры',ph:[[null,[[1,'Masks','ON / 100%','ALL'],[2,'MASK Pushbutton','PRESS','ALL']]]]},
+{id:'lossp',t:'LOSS OF PRESSURIZATION',g:'Environmental',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'CABIN'],[W,'DOOR UNLK']],ru:'Постепенная потеря герметизации кабины',ph:[[null,[[1,'Masks','ADJUSTED','ALL'],[2,'MASK Pushbutton','PRESS','ALL']]]]},
+{id:'dualdc',t:'DUAL DC GENERATORS FAILURE',g:'Electrical',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'1 DC GEN'],[T,'and'],[W,'2 DC GEN']],ru:'Оба DC-генератора отказали, бленкеры обоих перечёркнуты',ph:[[null,[[1,'BAT BUS TIE Selector','OFF','2'],[2,'Generators','RESET / ON (MAX 2 ATTEMPTS)','2']]],['A. If no generator is recovered:',[[3,'TRU Selector','1','2']]]]},
+{id:'bathot',t:'BAT HOT/WARM',g:'Electrical',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'BAT HOT']],ru:'Перегрев аккумулятора (HOT на индикаторе температуры)',ph:[[null,[[1,'Affected Battery (above 150 ºF)','OFF','2']]]]},
+{id:'esmkf',t:'ELECTRICAL SMOKE OR FIRE IN FLIGHT',g:'Electrical',tr:[[T,'Smoke or fire from a known or unknown electrical source']],ru:'В полёте: дым от электрооборудования',ph:[[null,[[1,'Masks and Goggles','ON / ADJUSTED / 100% / EMERGENCY','ALL'],[2,'MASK Pushbutton','PRESS','ALL']]]]},
+{id:'elevj',t:'ELEVATOR JAMMING',g:'Flight controls',tr:[],ru:'Заклинивание управления по тангажу',note:'A. Если заклинивание устранилось после шага 2 → продолжить нормальный полёт.',ph:[[null,[[1,'Automatic Pilot (if engaged)','DISENGAGE','1'],[2,'Control Columns','FORCE AGAINST JAMMING','1/2']]],['B. If the jamming persists:',[[3,'Control Columns','HOLD FIRMLY','1/2'],[4,'PITCH Control Disengage Selector','UNTIE','2*'],[5,'Pilots Functions (depending on which is the free column)','A.R.','1/2'],[6,'Configuration and Normal Trim','A.R.','PF']]]]},
+{id:'ailj',t:'AILERON JAMMING',g:'Flight controls',tr:[],ru:'Заклинивание управления по крену',note:'A. Если заклинивание устранилось после шага 2 → продолжить нормальный полёт.',ph:[[null,[[1,'Automatic Pilot (if engaged)','DISENGAGE','1'],[2,'IAS (if possible)','MAX 150 kts','1']]],['B. If the jamming persists:',[[3,'Control Wheels','HOLD FIRMLY','1/2'],[4,'ROLL Control Disengage Selector','UNTIE','2*'],[5,'Pilots functions (depending on which is the free column)','A.R.','1/2'],[6,'Normal Trim','A.R.','PF']]]]},
+{id:'ptr',t:'PITCH TRIM RUNAWAY',g:'Flight controls',tr:[],ru:'Резкое самопроизвольное движение по тангажу, индикатор TRIM ELEV движется туда же',ph:[[null,[[1,'R, L ELEV Selectors guard on STBY TRIMS panel','LIFT','1'],[2,'R, L ELEV Selectors on STBY TRIMS panel','A.R.','1']]]]},
+{id:'hydq',t:'HYDRAULIC QUANTITY LOSS',g:'Hydraulic',tr:[[C,'CAUTION'],[C,'1 HYD P'],[T,'and/or'],[C,'2 HYD P'],[T,'and/or'],[C,'3 HYD P']],ru:'Потеря количества гидрожидкости',ph:[[null,[[1,'Hydraulic Pumps','MAN/OFF','2']]]]},
+{id:'wingovht',t:'WING OVERHEAT',g:'Pneumatic',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'WING OVHT']],ru:'Перегрев крыла (утечка горячего воздуха)',ph:[[null,[[1,'Engine parameters','CHECK','1/2'],[2,'Affected PL (crossed magnetic indicator side/s) (if necessary)','RETARD','1/2'],[3,'Clock','RUNNING','2']]]]},
+{id:'efiref',t:'ENGINE FIRE OR SEVERE DAMAGE IN FLIGHT',g:'Power plant',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'1 E/FIRE'],[T,'or'],[W,'2 E/FIRE'],[T,'FIRE BELL']],ru:'В полёте: пожар или серьёзное повреждение двигателя',note:'При продолженном взлёте: дождаться положительной вертикальной, убрать шасси, достичь V2 — затем процедура. A. Погасло до 10 с / B.1 до 40 с → посадка немедленно + ENGINE SHUTDOWN IN-FLIGHT.',ph:[[null,[[1,'FFL (affected engine)','DIRECTLY TO OFF','2*'],[2,'Fire Handle (affected engine)','PULLED','2*'],[3,'Clock','RUNNING','2']]],['B. If any fire indication persists after 10 seconds:',[[4,'Fire Handle (affected engine)','TURN TO DISCH 1','2*']]],['B.2. If any fire indication persists after 40 seconds:',[[5,'Fire Handle (affected engine)','TURN TO DISCH 2','2*']]]]},
+{id:'flameout',t:'ENGINE FLAMEOUT',g:'Power plant',tr:[[T,'Power loss, ITT and NH decrease, with/without sudden yawing']],ru:'Падение мощности, ITT и NH без признаков пожара',ph:[[null,[[1,'PL (affected engine)','FI','1'],[2,'FFL (affected engine, when dropping below 30% NH)','DIRECTLY TO OFF','2*']]]]},
+{id:'dualeng',t:'DUAL ENGINE FAILURE',g:'Power plant',tr:[],ru:'Отказ обоих двигателей в полёте',ph:[[null,[[1,'Automatic Pilot (if connected)','DISENGAGE','1'],[2,'PLs','FI','1'],[3,'FFLs (when dropping below 30% NH)','DIRECTLY TO OFF','2*'],[4,'AOA (in clean configuration)','0.66 units','1']]]]},
+{id:'ga1',t:'GO-AROUND (1 ENGINE)',g:'Power plant',tr:[],ru:'Уход на второй круг с одним работающим двигателем',ph:[[null,[[1,'GO-AROUND','ANNOUNCE','1'],[2,'PL (operative engine)','MAX AUTO','1'],[3,'Bleed switches','OFF','2'],[4,'Speed','VREF + 12 KIAS','1'],[5,'Flaps','T/OFF','2'],[6,'Landing Gear (positive rate of climb)','RETRACT','2'],[7,'Continue operation as if performing a normal takeoff','','']]]]},
+{id:'autftr',t:'AUTOFEATHER FAILURE',g:'Power plant',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'AUTFTR']],ru:'Отказ автофлюгирования, затем отказ двигателя на взлёте/уходе',note:'Шаг 1 (Autofeather/APR … OFF … 2) — НЕ memory item. Жирным выделены только шаги 2–3.',ph:[['If an engine fails:',[[2,'FFL (affected engine)','DIRECTLY TO OFF','2*'],[3,'PL (operative engine)','ADVANCE ABOVE MAX AUTO','1']]]]},
+{id:'nlov',t:'NL OVERSPEED',g:'Power plant',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'1 NL OVSP'],[T,'and/or'],[W,'2 NL OVSP']],ru:'NL выше 106.5%',ph:[[null,[[1,'Corresponding PL','RETARD','1']]]]},
+{id:'propbrk',t:'UNSAFE PROPELLER BRAKE',g:'Power plant',tr:[[W,'WARNING'],[T,'MASTER BELL'],[W,'PROP BRK'],[T,'with/without UNLKD light']],ru:'Небезопасное состояние тормоза винта',ph:[[null,[[1,'Left FFL','DIRECTLY TO OFF','2*']]]]}
+];
+P.forEach(p=>{p.steps=[];p.ph.forEach(([h,s])=>s.forEach(x=>p.steps.push({n:x[0],it:x[1],ac:x[2],cr:x[3],h})))});
+const L=[
+// [category, question, answer, extra, typed-number key, approx-from-chart]
+['Роли и экипаж','Assault Transport — пределы перегрузки?','+3.0 g … −1.0 g','Aircraft Roles (Military)','3,1'],
+['Роли и экипаж','Normal Transport — пределы перегрузки?','+2.53 g … −1.0 g','','2.53,1'],
+['Роли и экипаж','Logistical Transport — пределы перегрузки?','+2.25 g … −0.85 g','','2.25,0.85'],
+['Роли и экипаж','Минимальный лётный экипаж?','2 — pilot и copilot','','2'],
+['Роли и экипаж','Когда обязателен третий член экипажа — jumpmaster/loadmaster?','Aerial delivery и combat offloading','Рекомендуется добавить assistant jumpmaster/loadmaster.'],
+['Роли и экипаж','Когда обязателен dropmaster?','Sea rescue operations',''],
+['Роли и экипаж','Emergency flight crew: самолёт без эвакуации, который может быть потерян — минимальный экипаж?','1 пилот','Абсолютный минимум для взлёта, полёта и посадки.','1'],
+['Роли и экипаж','Максимум перевозимых людей (без мин. экипажа и наблюдателя)?','71 — или число утверждённых мест, меньшее из двух','','71'],
+['Роли и экипаж','С какими NVG сертифицирована совместимость?','Generation III, Type I, Class B (MIL-STD-3009)','Соответствие не означает operational approval.'],
+['Роли и экипаж','Сертифицированные виды эксплуатации?','IFR, Night, Icing, Passenger, Cargo','Подтверждена способность RNP-5 (B-RNAV).'],
+
+['Массы','Normal Transport — max taxi weight?','21 050 kg (46 410 lb)','','21050'],
+['Массы','Normal Transport — max takeoff weight?','21 000 kg (46 300 lb)','','21000'],
+['Массы','Normal Transport — max landing weight?','20 700 kg (45 630 lb)','','20700'],
+['Массы','Normal Transport — weight limit without fuel (ZFW)?','18 500 kg (40 780 lb)','','18500'],
+['Массы','Normal Transport — max load factor и sink rate при посадке?','2.53 g; 600 fpm','','2.53,600'],
+['Массы','Logistical Transport — max taxi weight?','23 250 kg (51 270 lb)','','23250'],
+['Массы','Logistical Transport — max takeoff weight?','23 200 kg (51 160 lb)','','23200'],
+['Массы','Logistical Transport — max landing weight?','23 200 kg (51 160 lb)','','23200'],
+['Массы','Logistical Transport — weight limit without fuel (ZFW)?','20 700 kg (45 630 lb)','','20700'],
+['Массы','Logistical Transport — max load factor и sink rate при посадке?','2.25 g; 540 fpm','','2.25,540'],
+['Массы','Assault Transport — max takeoff/landing weight?','17 700 kg (39 030 lb)','','17700'],
+['Массы','Assault Transport — weight limit without fuel (ZFW)?','16 500 kg (36 380 lb)','','16500'],
+['Массы','Assault Transport — max load factor?','3.0 g','','3'],
+['Массы','Weight Limitations chart — Zone A?','Green, Recommended: Normal Transport до 2.53 g; ниже линии 3.0 g — Assault до 3 g','С учётом посадочной массы 20 700 kg.'],
+['Массы','Weight Limitations chart — Zone B?','Yellow, Caution: Logistical до 2.25 g',''],
+['Массы','Weight Limitations chart — Zone C?','Red, Not recommended: высокий риск повреждения конструкции — избегать','Только в крайней аварийной ситуации решение принимает пилот.'],
+['Массы','Zone C в турбулентности?','Запрещена даже при moderate турбулентности',''],
+['Массы','Что обязательно после полёта в Zone C?','Осмотр конструкции (structural inspection)',''],
+['Массы','Как садиться в Zone C?','На минимальной вертикальной скорости снижения',''],
+['Массы','Zone C: избыток топлива и избыток груза — где риск?','Топливо (справа на графике) — крыло на земле; груз (вверху) — крыло в полёте',''],
+['Массы','Max вертикальная скорость при посадке выше линии 20 700 kg?','540 fpm','Ниже линии — 600 fpm.','540'],
+['Массы','Минимальная полётная масса (по графику ЦТ)?','≈ 10 800 kg','','10800',1],
+
+['Скорости','VMO (max recommended) Zone A у земли?','≈ 246 KIAS до ≈ 15 000 ft, далее уменьшается до ≈ 181 KIAS на 30 000 ft','Barber pole + overspeed warning.','246',1],
+['Скорости','VMO (max recommended) Zone B?','≈ 245 KIAS у земли → ≈ 230 на 15 000 ft → ≈ 190 на 25 000 ft','','245',1],
+['Скорости','VD (maximum airspeed limit) Zone A?','297 KIAS до 13 000 ft, далее до ≈ 220 KIAS на 30 000 ft','','297',1],
+['Скорости','VD (maximum airspeed limit) Zone B?','≈ 295 KIAS у земли → 280 на 13 000 ft → ≈ 226 на 25 000 ft','','295',1],
+['Скорости','Полёт между VMO и VD в Zone A разрешён…?','При slight–moderate турбулентности; при severe — строго запрещён',''],
+['Скорости','Полёт между VMO и VD в Zone B разрешён…?','Только при slight; при moderate — строго запрещён',''],
+['Скорости','Какая скорость допустима до moderate турбулентности включительно?','Любая крейсерская до VMO',''],
+['Скорости','Severe turbulence penetration speed, Zone A (у земли)?','≈ 200 KIAS (≈ 179 на 24 000 ft, ≈ 157 на 30 000 ft)','В severe турбулентности самолёт не должен эксплуатироваться.','200',1],
+['Скорости','Severe turbulence penetration speed, Zone B (у земли)?','≈ 195 KIAS (≈ 181 на 19 500 ft, ≈ 161 на 25 000 ft)','','195',1],
+['Скорости','Manoeuvre speed VA (military), Zone A?','185 KIAS (до ≈ 27 800 ft, выше — до ≈ 176 на 30 000 ft)','','185',1],
+['Скорости','Manoeuvre speed VA (military), Zone B?','≈ 182 KIAS (до 25 000 ft)','','182',1],
+['Скорости','VFE T/OFF (10°)?','190 KIAS (SL–19 000 ft); 160 KIAS на 25 000 ft','Между 19 000 и 25 000 ft — линейно.','190,160'],
+['Скорости','VFE APPR (15°)?','185 KIAS (SL–19 000 ft); 160 KIAS на 25 000 ft','','185,160'],
+['Скорости','VFE LNDG (23°)?','180 KIAS (SL–19 000 ft); 160 KIAS на 25 000 ft','','180,160'],
+['Скорости','Выпуск закрылков запрещён выше (military)?','25 000 ft','Civil: 19 000 ft.','25000'],
+['Скорости','VLO = VLE (military)?','180 KIAS (SL–19 000 ft); 160 KIAS на 25 000 ft','Между — линейно.','180,160'],
+['Скорости','Max скорость аварийного выпуска шасси?','150 KIAS','','150'],
+['Скорости','Выпуск шасси запрещён выше (military)?','25 000 ft','Civil: 18 000 ft.','25000'],
+['Скорости','Paratroops door — open/close/полёт открытой?','160 KIAS','','160'],
+['Скорости','Rear door + ramp — open/close/полёт открытыми?','240 KIAS','','240'],
+['Скорости','Rear door + ramp + одна paratroops door открыты одновременно?','130 KIAS','','130'],
+['Скорости','Открытие задних/боковых дверей в полёте?','Только при соответствующем разрешении (authorization)',''],
+['Скорости','Openable cockpit window?','200 KIAS (в негерметичном полёте)','','200'],
+['Скорости','Full reverse на земле — max скорость?','120 KIAS','','120'],
+['Скорости','Tire limit speed?','178 KTAS (ground speed)','','178'],
+['Скорости','Стрелка IAS — когда amber?','Между VMO−2 kt и VMO+3 kt','Снова белая ниже VMO−4 kt.','2,3'],
+['Скорости','Стрелка IAS — когда red?','Выше VMO+3 kt','Снова amber ниже VMO+1 kt.','3'],
+['Скорости','VMO aural warning работает для…?','Только для Zone A','При изменении массы (выброс, дозаправка) обновить вес в FMS.'],
+
+['Перегрузки','Flaps и/или gear extended — допустимая перегрузка?','0 … +2.0 g','До соответствующей VFE/VLE.','0,2'],
+['Перегрузки','Slight turbulence — манёвры, Zone A?','0 … 2.0 g','','0,2'],
+['Перегрузки','Slight turbulence — манёвры, Zone B?','0.5 … 1.5 g','','0.5,1.5'],
+['Перегрузки','Moderate turbulence — манёвры, Zone A?','0.25 … 1.75 g','','0.25,1.75'],
+['Перегрузки','Moderate turbulence — манёвры, Zone B?','0.75 … 1.25 g','','0.75,1.25'],
+['Перегрузки','Asymmetric manoeuvres (элероны, крен), Zone A?','0.25 … 1.5 g','','0.25,1.5'],
+['Перегрузки','Asymmetric manoeuvres (элероны, крен), Zone B?','0.5 … 1.25 g','','0.5,1.25'],
+['Перегрузки','Какие манёвры запрещены?','Aerobatics, intentional spins, сваливание с тангажом > 20°, extreme dives',''],
+
+['Высота и температура','Max operating altitude, Zone A?','30 000 ft','','30000'],
+['Высота и температура','Max operating altitude, Zone B?','25 000 ft','','25000'],
+['Высота и температура','Минимальная температура в полёте?','−54 °C','','54',1],
+['Высота и температура','Верхняя температурная граница?','ISA+40 °C','','40'],
+['Высота и температура','Взлёт/посадка — диапазон высот?','от −1 000 до 14 000 ft PA','','1000,14000',1],
+['Высота и температура','Взлёт/посадка — диапазон температур?','от −40 °C до ISA+40 °C','','40,40'],
+['Высота и температура','Max tailwind component?','10 kt','','10'],
+['Высота и температура','Runway slope?','±2 %','','2'],
+['Высота и температура','Вода/снег/слякоть на ВПП — не взлетать при глубине более…?','19 mm (3/4 in)','','19'],
+['Высота и температура','Max altitude с открытой ventral door?','25 000 ft','','25000'],
+['Высота и температура','Max altitude AP/FD — military?','30 000 ft','Civil: 25 000 ft.','30000'],
+['Высота и температура','Min давление кислорода экипажа для взлёта?','500 psi','','500'],
+['Высота и температура','Выше 25 000 ft — кислород?','Маски всех членов экипажа подключены и сразу доступны',''],
+
+['Центровка и ВПП','Для какого положения шасси даны пределы ЦТ?','Шасси убрано; выпуск даёт кабрирующий момент 1.6 m·kg (139 in-lb)','','1.6'],
+['Центровка и ВПП','Передний предел ЦТ (military)?','13.5 % MAC (при больших массах смещается назад)','','13.5',1],
+['Центровка и ВПП','Задний предел ЦТ (military)?','32 % MAC','','32',1],
+['Центровка и ВПП','Lateral CG (ground loads) — давление в шинах MLG?','89 psi','','89'],
+['Центровка и ВПП','Lateral CG (ground loads) — что запрещено?','Pivoting и наезд на неровность выше 30 mm','','30'],
+['Центровка и ВПП','ACN rigid pavement, Zone A (subgrade A/B/C/ultra low)?','8 / 9 / 9 / 10','','8,9,10'],
+['Центровка и ВПП','ACN rigid pavement, Zone B?','9 / 10 / 11 / 12','','9,10,11,12'],
+['Центровка и ВПП','ACN flexible pavement, Zone A?','6 / 8 / 9 / 10','','6,8,9,10'],
+['Центровка и ВПП','ACN flexible pavement, Zone B?','8 / 9 / 10 / 11','','8,9,10,11'],
+['Центровка и ВПП','Crosswind limits где указаны?','В Performance Data Manual',''],
+
+['Тормоза','Max энергия на тормоза: при посадке / при RTO?','46.86 MJ / 46.84 MJ','','46.86,46.84'],
+['Тормоза','Brake cooling — Zone A?','Normal: можно взлетать сразу после посадки',''],
+['Тормоза','Brake cooling — Zone B?','Normal: ждать время по кривым (мин)',''],
+['Тормоза','Brake cooling — Zone C?','Caution: запись в журнал; если выплавились fuses MLG — ждать max 15 мин и уведомить ТО; иначе ждать полное время','','15'],
+['Тормоза','Brake cooling — Zone D?','Not recommended: запись в журнал и уведомить ТО',''],
+['Тормоза','Время по графику охлаждения vs BTIS?','Всегда ≤ времени, требуемого BTIS',''],
+
+['Грунтовые ВПП','Работа с грунтовой ВПП — что обязательно?','Запись в журнал каждый раз',''],
+['Грунтовые ВПП','Камни и гравий?','Крупнее 1 in — вкатаны; свободных крупнее 2 in быть не должно','','1,2'],
+['Грунтовые ВПП','Рыхлый грунт?','Не выше 2 in и не длиннее 60 ft','','2,60'],
+['Грунтовые ВПП','Колеи?','Не глубже 2 in (от окружающей поверхности)','','2'],
+['Грунтовые ВПП','Растительность?','Не выше 2 in','','2'],
+['Грунтовые ВПП','Толщина материала поверхности?','Не менее 12 in, хорошо утрамбован','','12'],
+['Грунтовые ВПП','"Hard" unpaved runway?','CBR ≥ 7, k ≥ 180 pci','','7,180'],
+['Грунтовые ВПП','"Soft" unpaved runway?','CBR от 2, k ≥ 50 pci','','2,50'],
+
+['Двигатель','Двигатель?','PW127G, Pratt & Whitney Canada, turboprop','','127'],
+['Двигатель','100 % TQ = ?','11 576 lb·ft','','11576'],
+['Двигатель','100 % NP = ?','20 000 rpm силовой турбины = 1 200 rpm винта','','20000,1200'],
+['Двигатель','100 % NH = ?','33 300 rpm','','33300'],
+['Двигатель','100 % NL = ?','27 700 rpm','','27700'],
+['Двигатель','Циклы запуска?','30 s ON – 1 min OFF; 30 s – 1 min; 30 s – 15 min','','30,1,15'],
+['Двигатель','Охлаждение после 3 запусков подряд?','15 минут','','15'],
+['Двигатель','Max ITT при запуске (transient)?','950 °C, не более 5 s','','950,5'],
+['Двигатель','Давление масла при запуске (масло < 10 °C, пока не достигнет 21 °C)?','Max 100 psi, min 40 psi','','100,40'],
+['Двигатель','Power plant maintenance message горит?','Не выпускать самолёт в полёт',''],
+['Двигатель','EEC и EPC в нормальном полёте?','Автоматический режим — EEC и EPC ON',''],
+['Двигатель','Power levers ниже flight idle в полёте?','Запрещено — потеря управления / заброс оборотов',''],
+['Двигатель','Reverse разрешён?','Только на земле',''],
+['Двигатель','BLS выключена — BLS OVRD?','Горящая BLS OVRD в нормальной индикации запрещена',''],
+['Двигатель','IEDS в нормальном полёте?','TQ, ITT, NP, NH всегда на верхнем экране; composite mode запрещён',''],
+['Двигатель','Напряжение для запуска: internal battery / external battery / GPU?','Min 22 / 22–30 / 24–30 V','','22,30,24'],
+['Двигатель','Max нагрузка батареи для generator-assisted start?','100 A на каждом индикаторе','','100'],
+
+['Мощность','Normal takeoff (2 двигателя): время, TQ, ITT, NH, NP?','5 min; 101 %; 765 °C; 102.3 %; 101 %','765 °C — абсолютный максимум, рабочий предел ITT по графику.','5,101,765,102.3'],
+['Мощность','ITT normal takeoff по графику?','740 °C при −35 °C и ниже → 765 °C при ≈ +27 °C и выше','','740,765',1],
+['Мощность','Maximum takeoff (OEI): время, TQ, ITT, NH, NP?','5 min; 112 %; 800 °C; 103.7 %; 101 %','','5,112,800,103.7'],
+['Мощность','Transition: время, TQ, ITT, NH, NP?','20 s; 125 %; 840 °C; 104.3 %; NP 120 %','NP 120 % — не более 5 s.','20,125,840,104.3,120'],
+['Мощность','Max continuous: время, TQ, ITT, NH, NP?','Без ограничения; 112 %; 800 °C; 103.7 %; 101 %','','112,800,103.7,101'],
+['Мощность','Max continuous — transient?','20 s; 125 %; 840 °C; 104.3 %; NP 120 % (5 s)','','20,125,840,104.3'],
+['Мощность','Для чего предназначена MCP?','Ненормальные случаи: один двигатель, сильное обледенение, требования ATC, препятствия',''],
+
+['Масло','Min давление масла: винт во флюгере / не во флюгере?','40 / 55 psi','','40,55'],
+['Масло','Max давление масла: постоянно / 20 s?','65 / 100 psi','','65,100'],
+['Масло','Min температура масла для запуска?','−54 °C','','54'],
+['Масло','Min температура масла для расфлюгирования?','−40 °C','','40'],
+['Масло','Min температура масла для взлёта?','0 °C (45 °C в условиях обледенения)','','0,45'],
+['Масло','Max температура масла: постоянно и в hotel mode?','125 °C','','125'],
+['Масло','Max температура масла до 20 s?','140 °C','','140'],
+['Масло','Масло: usable / total?','10.99 L (2.90 US gal) / 23.02 L (6.08 US gal)','','10.99,23.02'],
+['Масло','Отметка MIN на мерном стекле?','Остаётся 19.5 L; ещё 3.5 L до TOP-UP','','19.5,3.5'],
+['Масло','Max расход масла?','0.227 kg/h (0.5 lb/h) за последние 10 ч','','0.227'],
+['Масло','Какие масла можно смешивать?','Только первой строки таблицы (Type II, 5 cSt, PWA 521)',''],
+['Масло','Двигатель стоял ночь, уровень не проверен после полёта?','Сделать прогон двигателя, затем проверить уровень',''],
+
+['Винт','Винт?','Hamilton Standard HSD 568F-5, 6 лопастей, Ø 3 932 mm (12.9 ft)','','6,3932'],
+['Винт','Prop brake при попутном ветре?','Запрещено',''],
+['Винт','Prop brake без присмотра?','Запрещено — квалифицированный член экипажа в кабине; обход зоны заторможенного винта запрещён',''],
+['Винт','Max ITT при работе с prop brake?','715 °C (кроме запуска)','','715'],
+['Винт','Min интервал между включениями prop brake?','10 минут','','10'],
+['Винт','Заправка при работающем двигателе на prop brake?','Запрещена',''],
+['Винт','Посадка/высадка через дверь со стороны двигателя на prop brake?','Только при выключенном двигателе',''],
+['Винт','AF/APR?','Проверка ежедневно перед первым полётом; ARM на взлёте, заходе и посадке',''],
+['Винт','Auxiliary feathering pump (MAN) — цикл?','30 s ON / 10 min OFF; после 4 циклов по 30 s — охлаждение ≥ 1 ч','В AOM дословно: «After four hours of 30 seconds, let the unit cool for a minimum of 1 hour».','30,10,1'],
+
+['Топливо','Max давление заправки?','55 PSI','','55'],
+['Топливо','Порядок заправки?','Сначала внутренние (inboard), затем внешние',''],
+['Топливо','Перед заправкой под давлением и перед полётом?','Тест Refuel Control Panel; перед полётом — тест FQIS',''],
+['Топливо','Нормальная схема питания?','Tank-to-engine, aux boost pump STBY, crossfeed закрыт',''],
+['Топливо','Gravity transfer в полёте?','Только при отказе pressure transfer',''],
+['Топливо','Дисбаланс до 18 000 kg — main tanks?','270 kg (600 lb)','','270'],
+['Топливо','Дисбаланс до 18 000 kg — auxiliary tanks?','60 kg при сбалансированных main, −23 kg на каждые 100 kg дисбаланса main','','60,23,100'],
+['Топливо','Дисбаланс свыше 18 000 kg — main tanks?','90 kg (200 lb)','','90'],
+['Топливо','Дисбаланс свыше 18 000 kg — auxiliary tanks?','20 kg при сбалансированных main, иначе пренебрежимо мало','','20'],
+['Топливо','Usable fuel всего?','7 500 L (1 980 US gal)','','7500'],
+['Топливо','Usable fuel: main / auxiliary tank (каждый)?','1 695 L / 2 055 L','','1695,2055'],
+['Топливо','Main tank при раздельной заправке под давлением / самотёком?','1 540 L / 1 590 L','','1540,1590'],
+['Топливо','Max температура топлива в баке: JP-8, Jet A, Jet A-1, JP-5?','50 °C','','50'],
+['Топливо','Max температура топлива в баке: JP-4, Jet B?','35 °C','','35'],
+['Топливо','Температура топлива в полёте?','≥ 5 °C выше точки замерзания (для смеси — самая высокая)','','5'],
+['Топливо','Точка замерзания: Jet A / Jet B / Jet A-1 / JP-8 / JP-4 / JP-5?','−40 / −50 / −47 / −47 / −58 / −46 °C','','40,50,47,58,46'],
+['Топливо','NATO код JP-8 / Jet A-1 / JP-4 / JP-5?','F-34 / F-35 / F-40 / F-44 (F-43 без присадки)','','34,35,40,44'],
+['Топливо','Указатель топлива показывает «0»?','Остаток не гарантированно вырабатывается',''],
+['Топливо','Anti-icing additive — max концентрация?','0.15 % по объёму','','0.15'],
+
+['Системы','Давление в кабине: normal max / limit?','5.58 / 5.77 PSI','','5.58,5.77'],
+['Системы','Один двигатель + мощность TO/GA?','Пакет кондиционирования OFF',''],
+['Системы','Ручное управление наддувом?','Взлёт и посадка — кабина негерметична',''],
+['Системы','Генератор: постоянная нагрузка?','400 A; выше 400 A — не более 5 мин','','400,5'],
+['Системы','AC GPU?','110–118 V, min 10 kVA','','110,118,10'],
+['Системы','DC GPU для запуска?','28 VDC при нагрузке до 2 000 A','','28,2000'],
+['Системы','Розетки 115 VAC — max нагрузка?','1 000 VA (8.69 A)','','1000'],
+['Системы','Розетки 28 VDC — max нагрузка?','560 W (20 A)','','560'],
+['Системы','Гидронасосы в manual mode?','No.1 и No.2 ON на взлёте, уходе и посадке',''],
+['Системы','Гидрожидкости?','MIL-H-5606 и MIL-H-83282 (красные); с 83282 или смесью — не ниже −40 °C','Каждое пополнение — запись в журнал.','40'],
+['Системы','Износ шин?','Канавка ≥ 2 mm на ≥ ¾ окружности','','2'],
+['Системы','ARTCS?','Тест перед полётом; в нормальном полёте AUTO',''],
+['Системы','RBS?','Тест перед полётом; работает, выбран primary heater',''],
+['Системы','Cockpit entry door на взлёте и посадке?','Открыта (если аварийная процедура не требует иного)',''],
+['Системы','Внешние двери?','Проверить перед полётом и перед взлётом',''],
+['Системы','Кресла?','Кресла экипажа зафиксированы на взлёте/посадке; observer — зафиксировано или сложено',''],
+['Системы','HF при заправке?','Не использовать',''],
+['Системы','Emergency lighting?','ARMED во всех полётах',''],
+
+['Автопилот','AP / YD на взлёте?','Не включать; YD отключить до касания',''],
+['Автопилот','Min скорость для AP?','1.23 VSR','','1.23'],
+['Автопилот','AP в severe турбулентности?','Отключить',''],
+['Автопилот','Minimum Engage Height после взлёта?','1 000 ft AGL','','1000'],
+['Автопилот','Minimum Use Height в крейсере?','1 000 ft AGL','','1000'],
+['Автопилот','MUH на неточном заходе (VOR)?','600 ft AGL','','600'],
+['Автопилот','CAT I: отключить AP не ниже…?','200 ft AGL; отключился ниже 500 ft — не включать на этом заходе','','200,500'],
+['Автопилот','Заход с AP при отказавшем двигателе?','Запрещено начинать или продолжать',''],
+['Автопилот','Flight director на заходе?','Только если DH ≥ 200 ft','','200'],
+
+['Маркировка приборов','TQ: зелёная / жёлтая / красная?','0–101.5 % / 101.6–112.0 % / > 112–130 %','White mark 110.4 %; dashed red 112.1 % и 124.8 %.','101.5,112'],
+['Маркировка приборов','ITT: белая / зелёная / жёлтая / красная?','200–300 / 301–765 / 766–800 / 801–1000 °C','Amber triangle 715 °C (APU mode); dashed red 840 °C (950 °C в start).','765,800'],
+['Маркировка приборов','NP: шкалы?','White 0–42.1; amber 42.2–62.5; green 62.5–101; amber 101.1–103.5; red 103.5–125 %','Amber triangle 40 %; dashed white 70.8 %; dashed red 109.6 %.','62.5,101'],
+['Маркировка приборов','NH: шкалы?','White 0–64; green 64–102.3; amber 102.4–103.7; red 103.8–130 %','Dashed red 104.3 %.','64,102.3'],
+['Маркировка приборов','Oil pressure: шкалы?','Red 0–40; amber 40–55; green 55–65; amber 66–100; red 101–120 psi','Dashed red 100 psi.','55,65'],
+['Маркировка приборов','Oil temperature: шкалы?','Red −54…−40; amber −40…0; green 0–125; amber 126–140; red 141–150 °C','White triangle 45 °C.','0,125'],
+['Маркировка приборов','Cabin differential pressure?','Green 0–5.5; amber 5.5–5.7; red 5.7–8 psi','','5.5,5.7'],
+['Маркировка приборов','Cabin altitude?','Green 0–8 000; amber 8 000–10 000; red radial 10 000 ft','','8000,10000'],
+['Маркировка приборов','Elevator trim (R и L)?','Green 2.5–4.5 ANU; red radials 0 и 5 ANU','','2.5,4.5'],
+['Маркировка приборов','Aileron и rudder trim?','Aileron red ±8; rudder green 1R–0R, red 5R и 5L','','8,5'],
+['Маркировка приборов','AOA indicator?','Green 0–0.8; amber 0.8–0.9; red 0.9–1.0','','0.8,0.9'],
+['Маркировка приборов','AC voltmeter?','Green 108–118 V; amber 104–108 и 118–125 V; red 125 V','','108,118,125'],
+['Маркировка приборов','DC voltmeter?','Green 22–29 V; amber 16–22 и 29–32 V; red 16 и 32 V','','22,29,32'],
+['Маркировка приборов','Generator ammeter?','Green 0–400 A; amber 400–500 A; red 500 A','','400,500'],
+['Маркировка приборов','Hydraulic и brake pressure (normal и emergency)?','Green 2 900–3 100; amber 3 100–3 750; red 3 750 psi','','2900,3100,3750'],
+['Маркировка приборов','Hydraulic fluid quantity?','Green 63–77 % (blue radials 63 и 77 %)','','63,77'],
+['Маркировка приборов','Brake temperature?','Green 50–220; amber 220–450; red 450–700 °C','','220,450']
+];
+
+const byId=Object.fromEntries(P.map(p=>[p.id,p]));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const crewH=c=>esc(c).replace('*','<span class="star">*</span>');
+const KEY='c295mi-v1';let S={};
+try{S=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){S={}}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const IV=[0,1,2,4,8,16];const DAY=864e5;
+const st=id=>S[id]||(S[id]={b:0,d:0});
+const isDue=id=>{const s=st(id);return s.b===0||Date.now()>=s.d};
+function grade(id,ok){const s=st(id);s.b=ok?Math.min(5,s.b+1):1;s.d=Date.now()+IV[s.b]*DAY-36e5;save();stat()}
+function queue(){return P.filter(p=>isDue(p.id)).sort((a,b)=>st(a.id).b-st(b.id).b||st(a.id).d-st(b.id).d)}
+function stat(){const el=document.getElementById('stat');if(sec==='lim'){const m=LC.filter(c=>st2(c.id).b>=4).length;el.textContent=`Выучено ${m} из ${LC.length} · к повторению ${LC.filter(due2).length}`}else{const m=P.filter(p=>st(p.id).b>=4).length;el.textContent=`Выучено ${m} из ${P.length} · к повторению ${queue().length}`}}
+let sec='mi';
+
+const sel=document.getElementById('sel'),view=document.getElementById('view'),bar=document.getElementById('bar');
+let groups=[...new Set(P.map(p=>p.g))];
+sel.innerHTML=groups.map(g=>`<optgroup label="${esc(g)}">`+P.filter(p=>p.g===g).map(p=>`<option value="${p.id}">${esc(p.t)}</option>`).join('')+'</optgroup>').join('');
+let mode='queue',cur=P[0].id;
+
+function head(p,showTrig=true){
+ const tr=p.tr.map(([k,s])=>k===T?`<span class="tx">${esc(s)}</span>`:`<span class="ann ${k}">${esc(s)}</span>`).join('');
+ return `<div class="ch"><h2>${esc(p.t)}</h2><div class="grp">${esc(p.g)} · ${esc(p.ru)} · ${p.steps.length} memory ${p.steps.length===1?'item':'items'}</div>${showTrig&&tr?`<div class="trig">${tr}</div>`:''}${p.note?`<p class="note">${esc(p.note)}</p>`:''}</div>`}
+function rowH(s,i,opt={}){
+ const hide=opt.hide&&s.ac!=='';
+ return `<div class="row ${opt.cls||''}" data-i="${i}"><span class="n">${s.n}.</span><span class="it"><span>${esc(s.it)}</span><i></i></span><span class="ac ${hide?'mask':''}">${hide?'':esc(s.ac)}</span><span class="cr ${hide&&s.cr?'mask':''}">${hide&&s.cr?'':crewH(s.cr)}</span></div>`}
+function rowsH(p,fn){let out='',last;p.steps.forEach((s,i)=>{const r=fn(s,i);if(!r)return;if(s.h!==last){last=s.h;if(s.h)out+=`<div class="ph">${esc(s.h)}</div>`}out+=r});return out}
+
+const R={};
+R.queue=()=>{bar.hidden=true;const q=queue();
+ view.innerHTML=`<div class="bar"><button class="btn pri" id="go" ${q.length?'':'disabled'}>Начать повторение (${q.length})</button><span class="tx">Интервалы: 1 → 2 → 4 → 8 → 16 дней. Ошибка — карточка возвращается на 1 день.</span></div><div class="list">`+
+ P.map(p=>{const s=st(p.id);return `<button class="li" data-id="${p.id}"><span><b>${esc(p.t)}</b><small>${esc(p.g)} · ${p.steps.length} шаг. ${isDue(p.id)?'<span class="due">· повторить</span>':''}</small></span><span class="box">${[1,2,3,4,5].map(k=>`<i class="${s.b>=k?'f':''}"></i>`).join('')}</span></button>`}).join('')+'</div>';
+ view.querySelector('#go').onclick=()=>{cur=q[0].id;setMode('recall')};
+ view.querySelectorAll('.li').forEach(b=>b.onclick=()=>{cur=b.dataset.id;setMode('study')})};
+R.study=()=>{const p=byId[cur];let hide=false;
+ const draw=()=>{view.innerHTML=`<div class="card">${head(p)}${rowsH(p,(s,i)=>rowH(s,i,{hide}))}<div class="foot"><button class="btn" id="hd">${hide?'Показать все действия':'Закрыть действия'}</button><span class="sp"></span><button class="btn pri" id="rc">Проверить себя →</button></div></div>`;
+  view.querySelector('#hd').onclick=()=>{hide=!hide;draw()};view.querySelector('#rc').onclick=()=>setMode('recall');
+  view.querySelectorAll('.mask').forEach(m=>m.onclick=()=>{const r=m.closest('.row'),s=p.steps[+r.dataset.i];r.outerHTML=rowH(s,+r.dataset.i)})};draw()};
+R.recall=()=>{const p=byId[cur];let k=0,shown=false,bad=0;const res=[];
+ const draw=()=>{const done=k>=p.steps.length;
+  view.innerHTML=`<div class="card">${head(p)}${rowsH(p,(s,i)=>i<k?rowH(s,i,{cls:res[i]?'good':'bad'}):i===k&&shown?rowH(s,i,{cls:'cur'}):i===k?`<div class="row cur"><span class="n">${s.n}.</span><span class="it"><span class="tx">Назовите пункт, действие и кто выполняет</span></span><span></span><span></span></div>`:'')}
+  ${done?`<div class="msg" style="color:var(${bad?'--red':'--ok'})">${bad?`Ошибок: ${bad} из ${p.steps.length}. Карточка вернётся завтра.`:'Без ошибок — интервал увеличен.'}</div>`:''}
+  <div class="foot">${done?`<button class="btn" id="again">Ещё раз</button><span class="sp"></span><button class="btn pri" id="nx">Следующая по очереди →</button>`:shown?`<span class="tx">Честно: всё совпало, включая член экипажа и *?</span><span class="sp"></span><button class="btn no" id="n">Ошибся</button><button class="btn ok" id="y">Знал</button>`:`<span class="tx">Пробел — показать</span><span class="sp"></span><button class="btn pri" id="sh">Показать шаг ${p.steps[k].n}</button>`}</div></div>`;
+  const b=id=>view.querySelector(id);
+  if(done){grade(p.id,!bad);b('#again').onclick=R.recall;b('#nx').onclick=nextQ}
+  else if(shown){b('#y').onclick=()=>{res[k]=1;k++;shown=false;draw()};b('#n').onclick=()=>{res[k]=0;bad++;k++;shown=false;draw()}}
+  else b('#sh').onclick=()=>{shown=true;draw()}};
+ R._key=e=>{if(e.key===' '&&mode==='recall'){const b=view.querySelector('#sh')||view.querySelector('#y');if(b){e.preventDefault();b.click()}}};draw()};
+const norm=s=>s.toUpperCase().replace(/[º°]/g,'DEG').replace(/APPROX\w*/,'APPROX').replace(/[^A-Z0-9%]/g,'');
+R.write=()=>{const p=byId[cur];let k=0,bad=0,crew='',star=false,checked=false,last='';
+ const draw=()=>{const done=k>=p.steps.length,s=p.steps[k];
+  let w='';
+  if(!done&&s.ac===''){w=`<div class="wr"><div class="q">${s.h?`<span class="ph2">${esc(s.h)}</span>`:''}${s.n}. ${esc(s.it)}</div><div class="res tx">Этот шаг без действия — просто запомните формулировку.</div><button class="btn pri" id="ok2">Дальше</button></div>`}
+  else if(!done){const crews=['1','2','1/2','ALL','PF','LM/2'];
+   w=`<div class="wr"><div class="q">${s.h?`<span class="ph2">${esc(s.h)}</span>`:''}${s.n}. ${esc(s.it)} ……</div>
+   <input id="in" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ДЕЙСТВИЕ" value="${esc(last)}" ${checked?'disabled':''}>
+   <div class="crew">${crews.map(c=>`<button data-c="${c}" class="${crew===c?'on':''}">${c}</button>`).join('')}<button data-s="1" class="${star?'on':''}" aria-label="Звёздочка">*</button></div>
+   ${checked?`<div class="res" id="rs"></div><button class="btn pri" id="ok2" style="margin-top:8px">Дальше</button>`:`<button class="btn pri" id="ck" style="margin-top:8px">Проверить</button>`}</div>`}
+  view.innerHTML=`<div class="card">${head(p)}${rowsH(p,(t,i)=>i<k?rowH(t,i):'')}${done?`<div class="msg" style="color:var(${bad?'--red':'--ok'})">${bad?`Ошибок: ${bad}. Повторите ещё раз.`:'Всё написано верно!'}</div><div class="foot"><button class="btn" id="again">Ещё раз</button><span class="sp"></span><button class="btn pri" id="nx">Следующая по очереди →</button></div>`:w}</div>`;
+  const b=id=>view.querySelector(id);
+  if(done){grade(p.id,!bad);b('#again').onclick=R.write;b('#nx').onclick=nextQ;return}
+  if(s.ac===''){b('#ok2').onclick=()=>{k++;draw()};return}
+  const inp=b('#in');if(!checked){inp.focus();inp.oninput=()=>last=inp.value;inp.onkeydown=e=>{if(e.key==='Enter')b('#ck').click()}}
+  view.querySelectorAll('.crew button').forEach(x=>x.onclick=()=>{if(checked)return;last=inp.value;if(x.dataset.s)star=!star;else crew=x.dataset.c;draw()});
+  if(checked){const ok1=norm(last)===norm(s.ac),c2=(crew+(star?'*':''))===s.cr;const r=b('#rs');
+   r.innerHTML=`${ok1?'✓':'✗'} Действие: <b>${esc(s.ac)}</b><br>${c2?'✓':'✗'} Экипаж: <b>${crewH(s.cr)}</b>`;r.style.color=`var(${ok1&&c2?'--ok':'--red'})`;
+   if(!(ok1&&c2)&&!s._c){bad++;s._c=1}b('#ok2').onclick=()=>{delete s._c;k++;crew='';star=false;checked=false;last='';draw()};b('#ok2').focus()}
+  else b('#ck').onclick=()=>{last=inp.value;checked=true;draw()}};draw()};
+R.order=()=>{const p=byId[cur];let k=0,err=0;const pool=shuf(p.steps.map((s,i)=>i));
+ const draw=()=>{const done=k>=p.steps.length;
+  view.innerHTML=`<div class="card">${head(p)}${rowsH(p,(s,i)=>i<k?rowH(s,i):'')}${done?`<div class="msg" style="color:var(${err?'--red':'--ok'})">${err?`Неверных нажатий: ${err}`:'Порядок без ошибок!'}</div><div class="foot"><button class="btn" id="again">Ещё раз</button><span class="sp"></span><button class="btn pri" id="nx">Другая процедура →</button></div>`:`<div class="chips">${pool.filter(i=>i>=k).map(i=>{const s=p.steps[i];return `<button class="chip" data-i="${i}">${esc(s.it)}${s.ac?' — <b>'+esc(s.ac)+'</b>':''}</button>`}).join('')}</div><div class="foot"><span class="tx">Нажимайте шаги в правильном порядке</span></div>`}</div>`;
+  if(done){view.querySelector('#again').onclick=R.order;view.querySelector('#nx').onclick=()=>{cur=shuf(P)[0].id;sel.value=cur;R.order()};return}
+  view.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{const i=+c.dataset.i;const s=p.steps[i],t=p.steps[k];
+   if(i===k||(s.it===t.it&&s.ac===t.ac)){if(i!==k){const a=pool.indexOf(i),b2=pool.indexOf(k);[pool[a],pool[b2]]=[pool[b2],pool[a]]}k++;draw()}else{err++;c.classList.remove('shake');void c.offsetWidth;c.classList.add('shake')}})};draw()};
+R.scen=()=>{bar.hidden=true;const p=shuf(P)[0];const opts=shuf([p,...shuf(P.filter(x=>x!==p&&x.g!=='zz')).slice(0,3)]);
+ const tr=p.tr.map(([k,s])=>k===T?`<span class="tx">${esc(s)}</span>`:`<span class="ann ${k}">${esc(s)}</span>`).join('');
+ view.innerHTML=`<div class="card"><div class="ch"><h2>Что происходит?</h2><div class="grp">Ситуация: ${esc(p.ru)}</div>${tr?`<div class="trig">${tr}</div>`:''}</div><div class="opts">${opts.map(o=>`<button class="opt" data-id="${o.id}">${esc(o.t)}</button>`).join('')}</div><div class="foot" id="ft"><span class="tx">Выберите процедуру, затем выполните memory items</span></div></div>`;
+ view.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{view.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(x.dataset.id===p.id)x.classList.add('r')});if(b.dataset.id!==p.id)b.classList.add('w');
+  const f=view.querySelector('#ft');f.innerHTML=`<button class="btn" id="ns">Следующая ситуация</button><span class="sp"></span><button class="btn pri" id="dr">Вспомнить действия →</button>`;
+  f.querySelector('#ns').onclick=R.scen;f.querySelector('#dr').onclick=()=>{cur=p.id;setMode('recall')}})};
+R.quiz=()=>{bar.hidden=true;const all=P.flatMap(p=>p.steps.filter(s=>s.ac).map(s=>({p,s})));const {p,s}=shuf(all)[0];
+ const askCrew=Math.random()<.35;let opts,right;
+ if(askCrew){right=s.cr;opts=shuf([right,...shuf(['1','2','2*','1/2','ALL','PF','LM/2'].filter(c=>c!==right)).slice(0,3)])}
+ else{right=s.ac;const pool=[...new Set(all.map(x=>x.s.ac))].filter(a=>a!==right);opts=shuf([right,...shuf(pool).slice(0,3)])}
+ view.innerHTML=`<div class="card"><div class="ch"><div class="grp">${esc(p.t)}${s.h?' · '+esc(s.h):''}</div><h2>${s.n}. ${esc(s.it)} → ${askCrew?'кто выполняет?':'?'}</h2>${askCrew?`<div class="grp">Действие: ${esc(s.ac)}</div>`:''}</div><div class="opts">${opts.map(o=>`<button class="opt" data-v="${esc(o)}">${askCrew?crewH(o):esc(o)}</button>`).join('')}</div><div class="foot" id="ft"><span class="tx" id="sc"></span><span class="sp"></span><button class="btn pri" id="nq">Следующий вопрос →</button></div></div>`;
+ view.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{const ok=b.dataset.v===right;R.qs=R.qs||{n:0,ok:0};R.qs.n++;if(ok)R.qs.ok++;
+  view.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(x.dataset.v===right)x.classList.add('r')});if(!ok)b.classList.add('w');
+  view.querySelector('#sc').textContent=`Счёт: ${R.qs.ok} / ${R.qs.n}`});
+ view.querySelector('#nq').onclick=R.quiz};
+
+function nextQ(){const q=queue();cur=(q[0]||shuf(P)[0]).id;sel.value=cur;R[mode]()}
+/* ===== ОГРАНИЧЕНИЯ ===== */
+const LS_KEY='c295lim-v1';let S2={};
+try{S2=JSON.parse(localStorage.getItem(LS_KEY)||'{}')||{}}catch(e){S2={}}
+const save2=()=>{try{localStorage.setItem(LS_KEY,JSON.stringify(S2))}catch(e){}};
+const LC=L.map((r,i)=>({i,c:r[0],q:r[1],a:r[2],x:r[3]||'',k:r[4]||'',ap:!!r[5],id:r[1]}));
+const cats=[...new Set(LC.map(c=>c.c))];
+const st2=id=>S2[id]||(S2[id]={b:0,d:0});
+const due2=c=>{const s=st2(c.id);return s.b===0||Date.now()>=s.d};
+function grade2(c,ok){const s=st2(c.id);s.b=ok?Math.min(5,s.b+1):1;s.d=Date.now()+IV[s.b]*DAY-36e5;save2();stat()}
+let lcat='all';
+const lsel=document.getElementById('lsel'),lbar=document.getElementById('lbar');
+lsel.innerHTML='<option value="all">Все категории ('+LC.length+')</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)} (${LC.filter(x=>x.c===c).length})</option>`).join('');
+const pool2=()=>LC.filter(c=>lcat==='all'||c.c===lcat);
+const q2=list=>list.filter(due2).sort((a,b)=>{const A=st2(a.id),B=st2(b.id);return (A.b===0)-(B.b===0)||A.b-B.b||A.d-B.d});
+const strip=a=>a.replace(/\s*\([^)]*\)/g,'').replace(/≈\s*/g,'').trim();
+const nums=s=>(String(s).replace(/(\d)[\s ]+(?=\d{3}(?!\d))/g,'$1').replace(/,/g,'.').match(/\d+(?:\.\d+)?/g)||[]).map(Number);
+const ansH=c=>`<div class="ans">${esc(c.a)}${c.ap?' <span class="apx">≈ по графику</span>':''}</div>${c.x?`<div class="tx">${esc(c.x)}</div>`:''}`;
+const qcard=(c,inner,foot)=>`<div class="card"><div class="ch"><div class="grp">${esc(c.c)}</div><h2 class="qq">${esc(c.q)}</h2></div>${inner}<div class="foot">${foot}</div></div>`;
+let last2=null;
+function pick2(list,needK){let L2=needK?list.filter(c=>c.k):list;if(!L2.length)return null;const d=q2(L2).filter(c=>c!==last2);let c=d[0];if(!c){const r=L2.filter(x=>x!==last2);c=r[Math.floor(Math.random()*r.length)]||L2[0]}last2=c;return {c,free:!d.length}}
+
+R.lq=()=>{const due=LC.filter(due2),rev=due.filter(c=>st2(c.id).b>0).length,nw=due.length-rev;
+ view.innerHTML=`<div class="bar"><button class="btn pri" id="go">Повторить сейчас (${due.length})</button><span class="tx">${rev} к повторению · ${nw} новых · интервалы 1→2→4→8→16 дней</span></div><div class="list">`+
+ cats.map(cat=>{const cs=LC.filter(c=>c.c===cat),m=cs.filter(c=>st2(c.id).b>=4).length,d=cs.filter(due2).length;
+  return `<button class="li" data-c="${esc(cat)}"><span><b>${esc(cat)}</b><small>${cs.length} фактов${d?` · <span class="due">${d} к повторению</span>`:''}</small></span><span class="meter"><i style="width:${Math.round(m/cs.length*100)}%"></i></span></button>`}).join('')+'</div>';
+ view.querySelector('#go').onclick=()=>{lcat='all';lsel.value='all';setMode('lcard')};
+ view.querySelectorAll('.li').forEach(b=>b.onclick=()=>{lcat=b.dataset.c;lsel.value=lcat;setMode('lread')})};
+R.lread=()=>{let hide=false;const draw=()=>{const P2=pool2();const cs=lcat==='all'?cats:[lcat];
+ view.innerHTML=`<div class="bar"><button class="btn" id="hd">${hide?'Показать ответы':'Закрыть ответы'}</button><button class="btn pri" id="tr">Тренировать эту категорию →</button></div>`+cs.map(cat=>`<div class="card tbl"><div class="ph">${esc(cat)}</div>${P2.filter(c=>c.c===cat).map(c=>`<div class="lr"><div class="lq">${esc(c.q)}</div><div class="la ${hide?'mask':''}" data-i="${c.i}">${hide?'':esc(c.a)+(c.ap?' <span class="apx">≈ по графику</span>':'')}</div>${c.x&&!hide?`<div class="tx">${esc(c.x)}</div>`:''}</div>`).join('')}</div>`).join('');
+ view.querySelector('#hd').onclick=()=>{hide=!hide;draw()};view.querySelector('#tr').onclick=()=>setMode('lcard');
+ view.querySelectorAll('.la.mask').forEach(m=>m.onclick=()=>{const c=LC[+m.dataset.i];m.classList.remove('mask');m.innerHTML=esc(c.a)+(c.ap?' <span class="apx">≈ по графику</span>':'')})};draw()};
+R.lcard=()=>{const p=pick2(pool2());if(!p){view.innerHTML='<p>Нет карточек.</p>';return}const {c,free}=p;let shown=false;
+ const draw=()=>{view.innerHTML=qcard(c,shown?`<div class="wr">${ansH(c)}</div>`:'',shown?`<span class="tx">Ответили точно, со всеми цифрами?</span><span class="sp"></span><button class="btn no" id="n">Ошибся</button><button class="btn ok" id="y">Знал</button>`:`<span class="tx">${free?'Всё повторено — свободная тренировка':q2(pool2()).length+' в очереди'} · пробел — показать</span><span class="sp"></span><button class="btn pri" id="sh">Показать ответ</button>`);
+  const b=id=>view.querySelector(id);if(shown){b('#y').onclick=()=>{grade2(c,1);R.lcard()};b('#n').onclick=()=>{grade2(c,0);R.lcard()}}else b('#sh').onclick=()=>{shown=true;draw()}};
+ R._key=e=>{if(e.key===' '&&mode==='lcard'){const b=view.querySelector('#sh')||view.querySelector('#y');if(b){e.preventDefault();b.click()}}};draw()};
+R.ltype=()=>{const p=pick2(pool2(),1);if(!p){view.innerHTML='<div class="card"><div class="msg">В этой категории нет вопросов с числовым ответом — выберите другую.</div></div>';return}const {c}=p;
+ view.innerHTML=qcard(c,`<div class="wr"><input id="in" inputmode="decimal" autocomplete="off" placeholder="Цифры через пробел"><div class="tx">Введите все числа ответа (знак минус не нужен).</div><div id="rs"></div></div>`,`<span class="sp"></span><button class="btn pri" id="ck">Проверить</button>`);
+ const inp=view.querySelector('#in'),ck=view.querySelector('#ck');inp.focus();
+ const check=()=>{const want=nums(c.k),got=nums(inp.value);const ok=want.every(w=>got.some(g=>Math.abs(g-w)<1e-9));inp.disabled=true;grade2(c,ok);
+  view.querySelector('#rs').innerHTML=`<div class="res" style="color:var(${ok?'--ok':'--red'})">${ok?'✓ Верно':'✗ Неверно'}</div>${ansH(c)}`;ck.textContent='Дальше';ck.onclick=R.ltype;ck.focus()};
+ ck.onclick=check;inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ck.click()}}};
+function mcq(c){const right=strip(c.a);const same=shuf([...new Set(LC.filter(x=>x.c===c.c&&x!==c).map(x=>strip(x.a)))].filter(a=>a!==right));
+ let o=same.slice(0,3);if(o.length<3)o=o.concat(shuf([...new Set(LC.map(x=>strip(x.a)))].filter(a=>a!==right&&!o.includes(a))).slice(0,3-o.length));return {right,opts:shuf([right,...o])}}
+function mcqH(c,m,n){return qcard(c,`<div class="opts">${m.opts.map(o=>`<button class="opt" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div><div class="wr" id="ex" hidden></div>`,`<span class="tx" id="sc">${n||''}</span><span class="sp"></span><button class="btn pri" id="nq" hidden>Дальше →</button>`)}
+function bindMcq(c,m,done){view.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{const ok=b.dataset.v===m.right;view.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(x.dataset.v===m.right)x.classList.add('r')});if(!ok)b.classList.add('w');
+ const ex=view.querySelector('#ex');ex.hidden=false;ex.innerHTML=ansH(c);const nq=view.querySelector('#nq');nq.hidden=false;nq.focus();done(ok,nq)})}
+R.ltest=()=>{const p=pick2(pool2());if(!p)return;const {c}=p,m=mcq(c);R.ts=R.ts||{n:0,ok:0};
+ view.innerHTML=mcqH(c,m,R.ts.n?`Счёт: ${R.ts.ok} / ${R.ts.n}`:'');bindMcq(c,m,(ok,nq)=>{R.ts.n++;if(ok)R.ts.ok++;grade2(c,ok);view.querySelector('#sc').textContent=`Счёт: ${R.ts.ok} / ${R.ts.n}`;nq.onclick=R.ltest})};
+R.lexam=()=>{const N=Math.min(20,pool2().length);const qs=shuf(pool2()).slice(0,N);let k=0;const wrong=[];
+ const next=()=>{if(k>=N){const sc=Math.round((N-wrong.length)/N*100);
+  view.innerHTML=`<div class="card"><div class="ch"><div class="grp">Экзамен · ${esc(lcat==='all'?'все категории':lcat)}</div><h2>${sc}% — ${N-wrong.length} из ${N}</h2><div class="grp">${sc>=90?'Отлично.':sc>=75?'Хорошо, повторите ошибки.':'Нужно ещё поработать.'}</div></div>${wrong.map(c=>`<div class="lr"><div class="lq">${esc(c.q)}</div><div class="la">${esc(c.a)}</div></div>`).join('')}<div class="foot"><span class="sp"></span><button class="btn pri" id="ag">Новый экзамен</button></div></div>`;
+  view.querySelector('#ag').onclick=R.lexam;return}
+  const c=qs[k],m=mcq(c);view.innerHTML=mcqH(c,m,`Вопрос ${k+1} из ${N}`);
+  bindMcq(c,m,(ok,nq)=>{if(!ok)wrong.push(c);grade2(c,ok);nq.onclick=()=>{k++;next()}})};next()};
+lsel.onchange=()=>{lcat=lsel.value;R[mode]()};
+
+const MODES={mi:[['queue','Очередь'],['study','Читать'],['recall','Вспомнить'],['write','Написать'],['order','Порядок'],['scen','Сценарий'],['quiz','Тест']],lim:[['lq','Обзор'],['lread','Таблицы'],['lcard','Карточки'],['ltype','Цифры'],['ltest','Тест'],['lexam','Экзамен']]};
+const nav=document.getElementById('nav');
+function setMode(m){mode=m;sec=MODES.lim.some(x=>x[0]===m)?'lim':'mi';R._key=null;try{history.replaceState(null,'','#'+m)}catch(e){}
+ nav.innerHTML=MODES[sec].map(([k,t])=>`<button data-m="${k}" class="${k===m?'on':''}">${t}</button>`).join('');
+ nav.querySelectorAll('button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+ document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.s===sec));
+ document.getElementById('hintmi').hidden=sec!=='mi';document.getElementById('hintlim').hidden=sec!=='lim';
+ bar.hidden=!(sec==='mi'&&['study','recall','write','order'].includes(m));
+ lbar.hidden=!(sec==='lim'&&m!=='lq');
+ sel.value=cur;lsel.value=lcat;stat();R[m]();
+ if(sec==='mi'&&['queue','scen','quiz'].includes(m))bar.hidden=true;
+ window.scrollTo(0,0);try{const o=nav.querySelector('.on');nav.scrollLeft=o.offsetLeft-16}catch(e){}}
+document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>setMode(b.dataset.s==='lim'?'lq':'queue'));
+sel.onchange=()=>{cur=sel.value;R[mode]()};
+document.getElementById('rnd').onclick=()=>{cur=shuf(P.filter(p=>p.id!==cur))[0].id;sel.value=cur;R[mode]()};
+document.getElementById('nxt').onclick=nextQ;
+document.addEventListener('keydown',e=>{if(R._key&&e.target.tagName!=='INPUT')R._key(e)});
+try{const A=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.App;if(A)A.addListener('backButton',()=>{const home=sec==='lim'?'lq':'queue';if(mode!==home)setMode(home);else A.exitApp()})}catch(e){}
+const h=location.hash.slice(1);setMode([...MODES.mi,...MODES.lim].some(x=>x[0]===h)?h:'queue');
+}
+</script>
+</body>
+</html>
