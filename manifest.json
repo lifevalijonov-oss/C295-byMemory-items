@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "C-295 Memory Items",
+  "short_name": "C-295 MI",
+  "description": "C-295MW emergency procedure memory items trainer (AOM Section IV): study, recall, write, order, scenarios, quiz, spaced repetition.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0f13",
+  "theme_color": "#0c0f13",
+  "lang": "ru",
+  "categories": ["education"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
